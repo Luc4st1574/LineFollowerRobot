@@ -44,7 +44,7 @@ class PidRegulator:
         try:
             while self.running:
                 self._execute_pid_cycle()
-                time.sleep(max(self.dt / 1000.0, 0.001))  # Ensure a minimum sleep time
+                time.sleep(max(self.dt / 1000.0, 0.05))  # Ensure a minimum sleep time
         except Exception as e:
             logging.error("Error in PID control loop: %s", e)
             self.stop()

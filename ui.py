@@ -4,15 +4,15 @@ import logging
 import matplotlib.pyplot as plt
 
 # Default values that guarantee the robot follows the line
-DEFAULT_P = 5.0
+DEFAULT_P = 4.5
 DEFAULT_I = 0.0
-DEFAULT_D = 2.0
-DEFAULT_SPEED = 25.0
+DEFAULT_D = 2.5
+DEFAULT_SPEED = 20.0
 DEFAULT_FREQUENCY = 20
 DEFAULT_WHEEL_GAUGE = 0.05
 DEFAULT_SENSOR_POS = 5.0
-DEFAULT_SENSOR_WIDTH = 10.0
-DEFAULT_ACCELERATION = 40.0
+DEFAULT_SENSOR_WIDTH = 8.0
+DEFAULT_ACCELERATION = 30.0
 
 class ControlPanel(tk.Tk):
     def __init__(self, robot, sensor, pid, path_drawer):
@@ -172,40 +172,11 @@ class ControlPanel(tk.Tk):
         self.robot.set_acceleration(float(value))
 
     def reset_position(self):
-        """Reset robot position AND restore all sliders to known-good defaults."""
-        # Restore slider positions visually
-        self.p_slider.set(DEFAULT_P)
-        self.i_slider.set(DEFAULT_I)
-        self.d_slider.set(DEFAULT_D)
-        self.speed_slider.set(DEFAULT_SPEED)
-        self.freq_slider.set(DEFAULT_FREQUENCY)
-        self.wheel_gauge_slider.set(DEFAULT_WHEEL_GAUGE)
-        self.sensor_pos_slider.set(DEFAULT_SENSOR_POS)
-        self.sensor_width_slider.set(DEFAULT_SENSOR_WIDTH)
-        self.accel_slider.set(DEFAULT_ACCELERATION)
-
-        # Update labels
-        self.p_value_label.config(text=f"{DEFAULT_P:.2f}")
-        self.i_value_label.config(text=f"{DEFAULT_I:.2f}")
-        self.d_value_label.config(text=f"{DEFAULT_D:.2f}")
-        self.speed_value_label.config(text=f"{DEFAULT_SPEED:.2f}")
-        self.freq_value_label.config(text=f"{DEFAULT_FREQUENCY:.2f}")
-        self.wheel_gauge_value_label.config(text=f"{DEFAULT_WHEEL_GAUGE:.2f}")
-        self.sensor_pos_value_label.config(text=f"{DEFAULT_SENSOR_POS:.2f}")
-        self.sensor_width_value_label.config(text=f"{DEFAULT_SENSOR_WIDTH:.2f}")
-        self.accel_value_label.config(text=f"{DEFAULT_ACCELERATION:.2f}")
-
-        # Apply defaults to all components
-        self._apply_defaults()
-
-        # Reset sensor geometry to match defaults before resetting robot position
-        self.sensor.set_sensor_position(DEFAULT_SENSOR_POS)
-        self.sensor.set_sensor_width(DEFAULT_SENSOR_WIDTH)
-
+        """Reset robot position and PID state, keeping current slider parameters."""
         # Reset robot and PID state
         self.robot.reset_position()
         self.pid.reset_pid()
-        logging.info("Full reset: position, PID, and all parameters restored to defaults")
+        logging.info("Position and PID state reset (retaining slider values)")
 
     # === Window close handling ===
     def on_closing(self):

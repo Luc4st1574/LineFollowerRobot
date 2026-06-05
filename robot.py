@@ -83,13 +83,8 @@ class Robot:
         sensor_coords = np.array(self.sensor.sensor_line.coords)
         self.sensor_line.set_data(sensor_coords[:, 0], sensor_coords[:, 1])
 
-        # Redraw fully and refresh the blit background cache
-        self.robot_patch.set_visible(False)
-        self.sensor_line.set_visible(False)
-        self.fig.canvas.draw()
-        self.background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
-        self.robot_patch.set_visible(True)
-        self.sensor_line.set_visible(True)
+        # Redraw
+        self.fig.canvas.draw_idle()
 
     # === Control methods ===
     def set_acceleration(self, acceleration):
@@ -130,13 +125,14 @@ class Robot:
             sensor_coords = np.array(self.sensor.sensor_line.coords)
             self.sensor_line.set_data(sensor_coords[:, 0], sensor_coords[:, 1])
             self.fig.canvas.draw_idle()
-            self.fig.canvas.flush_events()
 
     # === Drawing and Animation ===
     def draw_shape(self, canvas):
         """Initializes the robot's drawing and starts the animation."""
         x, y = zip(*self.path_drawer.get_path())
-        self.fig, self.ax = plt.subplots(figsize=(8, 8))
+        from matplotlib.figure import Figure
+        self.fig = Figure(figsize=(8, 8))
+        self.ax = self.fig.add_subplot(111)
         self.ax.plot(x, y, 'k-', linewidth=2)
         self.ax.fill(x, y, edgecolor='black', fill=False)
         self._set_fixed_limits(x, y)
@@ -166,13 +162,7 @@ class Robot:
         self.canvas_agg.draw()
         self.canvas_agg.get_tk_widget().pack(side="top", fill="both", expand=True)
 
-        # Cache the static background (path only, no robot)
-        self.robot_patch.set_visible(False)
-        self.sensor_line.set_visible(False)
-        self.fig.canvas.draw()
-        self.background = self.fig.canvas.copy_from_bbox(self.ax.bbox)
-        self.robot_patch.set_visible(True)
-        self.sensor_line.set_visible(True)
+        # Ready for animation
 
         # Start the animation loop
         self.start_animation()
@@ -192,6 +182,11 @@ class Robot:
         self.ax.set_ylim(yl)
 
     def start_animation(self):
+        def init():
+            self.robot_patch.set_visible(True)
+            self.sensor_line.set_visible(True)
+            return self.robot_patch, self.sensor_line
+
         def update(frame):
             if not self.animation_running:
                 return self.robot_patch, self.sensor_line
@@ -211,9 +206,6 @@ class Robot:
             self.y -= v * np.cos(self.angle) * dt
             self.angle += w * dt
 
-            # Restore static background
-            self.fig.canvas.restore_region(self.background)
-
             # Update robot patch transform
             robot_t = Affine2D().rotate(self.angle).translate(self.x, self.y)
             self.robot_patch.set_transform(robot_t + self.ax.transData)
@@ -223,17 +215,11 @@ class Robot:
             sensor_coords = np.array(self.sensor.sensor_line.coords)
             self.sensor_line.set_data(sensor_coords[:, 0], sensor_coords[:, 1])
 
-            # Blit only the animated artists
-            self.ax.draw_artist(self.robot_patch)
-            self.ax.draw_artist(self.sensor_line)
-            self.fig.canvas.blit(self.ax.bbox)
-            self.fig.canvas.flush_events()
-
             return self.robot_patch, self.sensor_line
 
         self.animation_running = True
         self.ani = FuncAnimation(
-            self.fig, update, frames=None, interval=50,
+            self.fig, update, init_func=init, frames=None, interval=50,
             blit=True, repeat=True, cache_frame_data=False
         )
         self.canvas_agg.draw()
