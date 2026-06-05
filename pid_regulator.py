@@ -44,28 +44,35 @@ class PidRegulator:
         try:
             while self.running:
                 self._execute_pid_cycle()
-                time.sleep(max(self.dt / 1000.0, 0.05))  # Ensure a minimum sleep time
+                time.sleep(max(self.dt / 1000.0, 0.001))  # Ensure a minimum sleep time
         except Exception as e:
             logging.error("Error in PID control loop: %s", e)
             self.stop()
 
     def _execute_pid_cycle(self):
         """Executes a single cycle of the PID control loop."""
-        position = self.sensor.last_seen
+        position = self.sensor.get_line_position(self.robot.path_drawer.get_path_line())
 
-        # Handle large position errors
+        # Handle large position errors (sensor lost the line)
         if abs(position) > 1:
+            # Spin in place toward the last known direction
             if position < 0:
-                self.robot.set_motor_speeds(0, self.speed)  # Correct left
+                self.robot.set_motor_speeds(0, self.speed)  # turn left
             else:
-                self.robot.set_motor_speeds(self.speed, 0)  # Correct right
+                self.robot.set_motor_speeds(self.speed, 0)  # turn right
+            # Reset integral to avoid windup while lost
+            self.sum_error = 0.0
             logging.debug("Large position error: %.2f", position)
         else:
             error = 0.0 - position
-            self.sum_error += error * self.dt / 1000.0
+            dt_s = self.dt / 1000.0
+            # Integral with anti-windup: clamp accumulated error
+            self.sum_error += error * dt_s
+            max_integral = self.speed  # cap integral accumulation
+            self.sum_error = max(-max_integral, min(max_integral, self.sum_error))
+
             control_signal = self._calculate_control_signal(error)
 
-            # Apply the control signal to motor speeds
             vl, vr = self._adjust_motor_speeds(control_signal)
             self.robot.set_motor_speeds(vl, vr)
 
@@ -73,7 +80,6 @@ class PidRegulator:
                 "PID cycle: error=%.2f, sum_error=%.2f, control_signal=%.2f, vl=%.2f, vr=%.2f",
                 error, self.sum_error, control_signal, vl, vr
             )
-
             self.last_error = error
 
     def _calculate_control_signal(self, error):
@@ -87,12 +93,19 @@ class PidRegulator:
 
     def _adjust_motor_speeds(self, control_signal):
         """Adjusts the motor speeds based on the control signal."""
+        # Clamp control signal so we don't exceed max speed or go negative
+        control_signal = max(-self.speed, min(self.speed, control_signal))
         if control_signal < 0:
-            vl = max(self.speed + control_signal, 0)
+            # Turning left: slow down left wheel
+            vl = self.speed + control_signal  # += negative = reduce
             vr = self.speed
         else:
+            # Turning right: slow down right wheel
             vl = self.speed
-            vr = max(self.speed - control_signal, 0)
+            vr = self.speed - control_signal
+        # Ensure both speeds are in [0, speed]
+        vl = max(0.0, min(self.speed, vl))
+        vr = max(0.0, min(self.speed, vr))
         return vl, vr
 
     # === PID Parameter Setters ===

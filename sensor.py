@@ -101,6 +101,9 @@ class Sensor:
             logging.debug("Sensor position relative to path: %.2f", normalized_position)
             return normalized_position
         else:
-            logging.debug("No intersection found, using last known position: %.2f", self.last_seen)
-            return self.last_seen
+            # If line is lost, return a value outside [-1, 1] to trigger the lost-line recovery.
+            # We preserve the sign of the last known position.
+            lost_val = 2.0 if self.last_seen >= 0 else -2.0
+            logging.debug("No intersection found, sensor lost. Returning: %.2f", lost_val)
+            return lost_val
 

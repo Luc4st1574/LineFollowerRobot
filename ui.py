@@ -3,6 +3,17 @@ from tkinter import ttk
 import logging
 import matplotlib.pyplot as plt
 
+# Default values that guarantee the robot follows the line
+DEFAULT_P = 5.0
+DEFAULT_I = 0.0
+DEFAULT_D = 2.0
+DEFAULT_SPEED = 25.0
+DEFAULT_FREQUENCY = 20
+DEFAULT_WHEEL_GAUGE = 0.05
+DEFAULT_SENSOR_POS = 5.0
+DEFAULT_SENSOR_WIDTH = 10.0
+DEFAULT_ACCELERATION = 40.0
+
 class ControlPanel(tk.Tk):
     def __init__(self, robot, sensor, pid, path_drawer):
         super().__init__()
@@ -35,6 +46,9 @@ class ControlPanel(tk.Tk):
         # Set up acceleration controls
         self._create_acceleration_controls(controls_frame)
 
+        # Apply defaults so PID / robot start with known good values
+        self._apply_defaults()
+
         # Configure the grid to expand properly
         self.grid_columnconfigure(0, weight=2)
         self.grid_columnconfigure(1, weight=1)
@@ -43,6 +57,18 @@ class ControlPanel(tk.Tk):
 
         # Set up closing protocol
         self.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+    def _apply_defaults(self):
+        """Push default values into PID, robot, and sensor without touching sliders."""
+        self.pid.set_p(DEFAULT_P)
+        self.pid.set_i(DEFAULT_I)
+        self.pid.set_d(DEFAULT_D)
+        self.pid.set_speed(DEFAULT_SPEED)
+        self.pid.set_frequency(DEFAULT_FREQUENCY)
+        self.robot.set_wheel_gauge(DEFAULT_WHEEL_GAUGE)
+        self.robot.set_acceleration(DEFAULT_ACCELERATION)
+        self.sensor.set_sensor_position(DEFAULT_SENSOR_POS)
+        self.sensor.set_sensor_width(DEFAULT_SENSOR_WIDTH)
 
     def _create_controls_frame(self):
         """Create and return the control frame on the right side of the window."""
@@ -55,28 +81,39 @@ class ControlPanel(tk.Tk):
         pid_frame = ttk.LabelFrame(parent, text="PID Controller", padding=(10, 10))
         pid_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
 
-        # Create PID parameter sliders and speed/frequency sliders
-        self.p_slider, self.p_value_label = self._create_slider(pid_frame, "P:", 0, self.update_p, initial=2.0)
-        self.i_slider, self.i_value_label = self._create_slider(pid_frame, "I:", 1, self.update_i, initial=2.0)
-        self.d_slider, self.d_value_label = self._create_slider(pid_frame, "D:", 2, self.update_d, initial=3.0)
-        self.speed_slider, self.speed_value_label = self._create_slider(pid_frame, "Speed:", 3, self.update_speed, to=80.0, initial=20.0)
-        self.freq_slider, self.freq_value_label = self._create_slider(pid_frame, "Frequency:", 4, self.update_frequency, to=50, initial=20)
+        self.p_slider, self.p_value_label = self._create_slider(
+            pid_frame, "P:", 0, self.update_p, from_=0.0, to=10.0, initial=DEFAULT_P)
+        self.i_slider, self.i_value_label = self._create_slider(
+            pid_frame, "I:", 1, self.update_i, from_=0.0, to=5.0, initial=DEFAULT_I)
+        self.d_slider, self.d_value_label = self._create_slider(
+            pid_frame, "D:", 2, self.update_d, from_=0.0, to=10.0, initial=DEFAULT_D)
+        self.speed_slider, self.speed_value_label = self._create_slider(
+            pid_frame, "Speed:", 3, self.update_speed, from_=1.0, to=80.0, initial=DEFAULT_SPEED)
+        self.freq_slider, self.freq_value_label = self._create_slider(
+            pid_frame, "Frequency:", 4, self.update_frequency, from_=1, to=50, initial=DEFAULT_FREQUENCY)
 
     def _create_geometry_controls(self, parent):
         """Create geometry control sliders (wheel gauge, sensor position, sensor width)."""
         geometry_frame = ttk.LabelFrame(parent, text="Geometry", padding=(10, 10))
         geometry_frame.grid(row=1, column=0, padx=10, pady=10, sticky="nsew")
 
-        # Create sliders for wheel gauge, sensor position, and sensor width
-        self.wheel_gauge_slider, self.wheel_gauge_value_label = self._create_slider(geometry_frame, "Wheel Gauge:", 0, self.update_wheel_gauge, from_=0.01, to=0.2, initial=0.05)
-        self.sensor_pos_slider, self.sensor_pos_value_label = self._create_slider(geometry_frame, "Sensor Position:", 1, self.update_sensor_position, from_=0.03, to=30, initial=self.sensor.distance * 100)
-        self.sensor_width_slider, self.sensor_width_value_label = self._create_slider(geometry_frame, "Sensor Width:", 2, self.update_sensor_width, from_=2, to=20, initial=self.sensor.width * 100)
+        self.wheel_gauge_slider, self.wheel_gauge_value_label = self._create_slider(
+            geometry_frame, "Wheel Gauge:", 0, self.update_wheel_gauge,
+            from_=0.01, to=0.2, initial=DEFAULT_WHEEL_GAUGE)
+        self.sensor_pos_slider, self.sensor_pos_value_label = self._create_slider(
+            geometry_frame, "Sensor Pos:", 1, self.update_sensor_position,
+            from_=0.5, to=30, initial=DEFAULT_SENSOR_POS)
+        self.sensor_width_slider, self.sensor_width_value_label = self._create_slider(
+            geometry_frame, "Sensor Width:", 2, self.update_sensor_width,
+            from_=1, to=20, initial=DEFAULT_SENSOR_WIDTH)
 
     def _create_acceleration_controls(self, parent):
         """Create acceleration slider."""
         accel_frame = ttk.LabelFrame(parent, text="Acceleration", padding=(10, 10))
         accel_frame.grid(row=3, column=0, padx=10, pady=10, sticky="nsew")
-        self.accel_slider, self.accel_value_label = self._create_slider(accel_frame, "Acceleration:", 0, self.update_acceleration, from_=1.0, to=80.0, initial=20.0)
+        self.accel_slider, self.accel_value_label = self._create_slider(
+            accel_frame, "Acceleration:", 0, self.update_acceleration,
+            from_=1.0, to=80.0, initial=DEFAULT_ACCELERATION)
 
     def _create_reset_button(self, parent):
         """Create reset position button."""
@@ -87,13 +124,11 @@ class ControlPanel(tk.Tk):
         """Create a slider with a label and value display."""
         ttk.Label(parent, text=label).grid(row=row, column=0, sticky="e")
 
-        # Value display label
         value_label = ttk.Label(parent, text=f"{initial:.2f}")
         value_label.grid(row=row, column=2, sticky="w")
 
-        # Slider control
         slider = ttk.Scale(parent, from_=from_, to=to, orient=tk.HORIZONTAL,
-                        command=lambda value, lbl=value_label: self._update_slider_value(value, command, lbl))
+                           command=lambda value, lbl=value_label: self._update_slider_value(value, command, lbl))
         slider.set(initial)
         slider.grid(row=row, column=1, sticky="ew")
 
@@ -107,59 +142,70 @@ class ControlPanel(tk.Tk):
 
     # === Update methods for sliders ===
     def update_p(self, value):
-        """Update the proportional gain (P) in the PID controller."""
         self.pid.set_p(float(value))
-        logging.info(f"Proportional gain set to {value}")
 
     def update_i(self, value):
-        """Update the integral gain (I) in the PID controller."""
         self.pid.set_i(float(value))
-        logging.info(f"Integral gain set to {value}")
 
     def update_d(self, value):
-        """Update the derivative gain (D) in the PID controller."""
         self.pid.set_d(float(value))
-        logging.info(f"Derivative gain set to {value}")
 
     def update_speed(self, speed):
-        """Update the robot speed."""
-        speed_value = float(speed)
-        self.robot.set_speed(speed_value)
-        self.pid.set_speed(speed_value)
-        logging.info(f"Robot speed set to {speed_value}")
+        self.pid.set_speed(float(speed))
 
     def update_frequency(self, freq):
-        """Update the frequency of the PID controller."""
         self.pid.set_frequency(int(float(freq)))
-        logging.info(f"PID frequency set to {freq}")
 
     def update_wheel_gauge(self, value):
-        """Update the wheel gauge of the robot."""
         self.robot.set_wheel_gauge(float(value))
         self.robot.update_robot()
-        logging.info(f"Wheel gauge set to {value}")
 
     def update_sensor_position(self, value):
-        """Update the position of the sensor relative to the robot."""
         self.sensor.set_sensor_position(float(value))
         self.robot.update_robot()
-        logging.info(f"Sensor position set to {value}")
 
     def update_sensor_width(self, value):
-        """Update the width of the sensor."""
         self.sensor.set_sensor_width(float(value))
         self.robot.update_robot()
-        logging.info(f"Sensor width set to {value}")
 
     def update_acceleration(self, value):
-        """Update the robot's acceleration."""
         self.robot.set_acceleration(float(value))
-        logging.info(f"Acceleration set to {value}")
 
     def reset_position(self):
-        """Reset the robot's position to its initial state."""
+        """Reset robot position AND restore all sliders to known-good defaults."""
+        # Restore slider positions visually
+        self.p_slider.set(DEFAULT_P)
+        self.i_slider.set(DEFAULT_I)
+        self.d_slider.set(DEFAULT_D)
+        self.speed_slider.set(DEFAULT_SPEED)
+        self.freq_slider.set(DEFAULT_FREQUENCY)
+        self.wheel_gauge_slider.set(DEFAULT_WHEEL_GAUGE)
+        self.sensor_pos_slider.set(DEFAULT_SENSOR_POS)
+        self.sensor_width_slider.set(DEFAULT_SENSOR_WIDTH)
+        self.accel_slider.set(DEFAULT_ACCELERATION)
+
+        # Update labels
+        self.p_value_label.config(text=f"{DEFAULT_P:.2f}")
+        self.i_value_label.config(text=f"{DEFAULT_I:.2f}")
+        self.d_value_label.config(text=f"{DEFAULT_D:.2f}")
+        self.speed_value_label.config(text=f"{DEFAULT_SPEED:.2f}")
+        self.freq_value_label.config(text=f"{DEFAULT_FREQUENCY:.2f}")
+        self.wheel_gauge_value_label.config(text=f"{DEFAULT_WHEEL_GAUGE:.2f}")
+        self.sensor_pos_value_label.config(text=f"{DEFAULT_SENSOR_POS:.2f}")
+        self.sensor_width_value_label.config(text=f"{DEFAULT_SENSOR_WIDTH:.2f}")
+        self.accel_value_label.config(text=f"{DEFAULT_ACCELERATION:.2f}")
+
+        # Apply defaults to all components
+        self._apply_defaults()
+
+        # Reset sensor geometry to match defaults before resetting robot position
+        self.sensor.set_sensor_position(DEFAULT_SENSOR_POS)
+        self.sensor.set_sensor_width(DEFAULT_SENSOR_WIDTH)
+
+        # Reset robot and PID state
         self.robot.reset_position()
-        logging.info("Robot position reset")
+        self.pid.reset_pid()
+        logging.info("Full reset: position, PID, and all parameters restored to defaults")
 
     # === Window close handling ===
     def on_closing(self):
@@ -174,4 +220,3 @@ class ControlPanel(tk.Tk):
 def create_control_panel(robot, sensor, pid, path_drawer):
     """Function to create and return the control panel."""
     return ControlPanel(robot, sensor, pid, path_drawer)
-
